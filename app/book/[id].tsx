@@ -1,32 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useBooks } from '../../src/hooks/useBooks';
 import { Book } from '../../src/types';
-import { ArrowLeft, Save, Trash2, Tag, MessageSquare, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, Save, Trash2, Tag, MessageSquare, ExternalLink, ShoppingCart } from 'lucide-react-native';
 import * as Linking from 'expo-linking';
+import { useApp } from '../../src/context/AppContext';
+import { getAmazonUrl } from '../../src/utils/isbn';
 
 export default function BookDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { saveBook, removeBook, getSavedBook, isSaved: checkIsSaved, updateBook } = useBooks();
+  const { theme, isDark, t } = useApp();
 
   const [book, setBook] = useState<Book | null>(null);
   const [tagsInput, setTagsInput] = useState('');
   const [comment, setComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
+  const amazonUrl = book?.isbn ? getAmazonUrl(book.isbn) : null;
+
   useEffect(() => {
     if (params.bookData) {
       const parsedBook = JSON.parse(params.bookData as string);
-      // Check if we have a saved version which might have more data
       const savedVersion = getSavedBook(parsedBook.id);
 
       if (savedVersion) {
         setBook(savedVersion);
         setTagsInput(savedVersion.tags?.join(', ') || '');
         setComment(savedVersion.comment || '');
-        setIsEditing(true); // Already saved, so we are editing
+        setIsEditing(true);
       } else {
         setBook(parsedBook);
         setTagsInput('');
@@ -34,163 +39,308 @@ export default function BookDetailScreen() {
         setIsEditing(false);
       }
     }
-  }, [params.bookData, getSavedBook]); // Re-run if saved books change? Maybe.
-
-  // Also listen to saved state changes if possible, but useBooks hook is local to component unless we use context.
-  // Since we don't use context, we rely on loadSavedBooks being called inside useBooks,
-  // but different useBooks instances don't share state automatically without Context/Redux.
-  // This is a limitation of the current simple implementation.
-  // However, `saveBook` writes to AsyncStorage.
-  // If we want this screen to update when main screen updates... well main screen updates storage.
-  // This screen initializes from params or storage.
-  // If we save here, we update storage. Main screen might not reflect immediately if it doesn't poll.
-  // Ideally we should use a Context for `useBooks`.
-  // For now, I will assume basic functionality is enough.
+  }, [params.bookData, getSavedBook]);
 
   const handleSave = async () => {
     if (!book) return;
 
-    const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+    const tags = tagsInput.split(',').map(tag => tag.trim()).filter(Boolean);
     const updatedBook = {
-        ...book,
-        tags,
-        comment
+      ...book,
+      tags,
+      comment
     };
 
     if (checkIsSaved(book.id)) {
-        await updateBook(updatedBook);
-        Alert.alert('Updated', 'Book details updated successfully');
+      await updateBook(updatedBook);
+      Alert.alert(t('updated'), t('updatedMessage'));
     } else {
-        await saveBook(updatedBook);
-        Alert.alert('Saved', 'Book added to library');
-        setIsEditing(true);
+      await saveBook(updatedBook);
+      Alert.alert(t('saved'), t('savedMessage'));
+      setIsEditing(true);
     }
-    // Update local state to reflect changes
     setBook(updatedBook);
   };
 
   const handleDelete = async () => {
-      if (!book) return;
+    if (!book) return;
 
-      Alert.alert(
-          "Delete Book",
-          "Are you sure you want to remove this book from your library?",
-          [
-              { text: "Cancel", style: "cancel" },
-              {
-                  text: "Delete",
-                  style: "destructive",
-                  onPress: async () => {
-                      await removeBook(book.id);
-                      router.back();
-                  }
-              }
-          ]
-      );
+    Alert.alert(
+      t('deleteBook'),
+      t('deleteConfirm'),
+      [
+        { text: t('cancel'), style: "cancel" },
+        {
+          text: t('delete'),
+          style: "destructive",
+          onPress: async () => {
+            await removeBook(book.id);
+            router.back();
+          }
+        }
+      ]
+    );
   };
 
-  if (!book) return <View className="flex-1 bg-white dark:bg-slate-900" />;
+  if (!book) return <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} />;
 
   const isSaved = checkIsSaved(book.id);
 
   return (
-    <View className="flex-1 bg-white dark:bg-slate-900">
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View className="flex-row items-center justify-between p-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-        <TouchableOpacity onPress={() => router.back()} className="p-2">
-            <ArrowLeft size={24} className="text-slate-700 dark:text-slate-200" color="#334155" />
+      <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.cardBorder }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-slate-800 dark:text-slate-100" numberOfLines={1}>Book Details</Text>
-        <View className="w-10" />
+        <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>{t('bookDetails')}</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-      <ScrollView className="flex-1 p-4">
-        <View className="flex-row gap-4 mb-6">
-            <View className="w-32 h-48 bg-slate-100 dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden border border-slate-200 dark:border-slate-700">
-                 {book.thumbnail ? (
-                    <Image source={{ uri: book.thumbnail }} className="w-full h-full" resizeMode="cover" />
-                 ) : (
-                    <View className="flex-1 items-center justify-center">
-                        <Text className="text-slate-400">No Image</Text>
-                    </View>
-                 )}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.bookHeader}>
+            <View style={[styles.thumbnailContainer, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              {book.thumbnail ? (
+                <Image source={{ uri: book.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
+              ) : (
+                <View style={styles.noImage}>
+                  <Text style={[styles.noImageText, { color: theme.textMuted }]}>No Image</Text>
+                </View>
+              )}
             </View>
-            <View className="flex-1 gap-2">
-                <Text className="text-xl font-bold text-slate-900 dark:text-slate-100">{book.title}</Text>
-                <Text className="text-slate-600 dark:text-slate-400 font-medium">{book.authors.join(', ')}</Text>
-                {book.publishedDate && (
-                    <Text className="text-slate-500 dark:text-slate-500 text-sm">Published: {book.publishedDate}</Text>
-                )}
-                {book.isbn && (
-                    <Text className="text-slate-500 dark:text-slate-500 text-sm">ISBN: {book.isbn}</Text>
-                )}
+            <View style={styles.bookInfo}>
+              <Text style={[styles.bookTitle, { color: theme.text }]}>{book.title}</Text>
+              <Text style={[styles.bookAuthor, { color: theme.textSecondary }]}>{book.authors.join(', ')}</Text>
+              {book.publishedDate && (
+                <Text style={[styles.bookMeta, { color: theme.textMuted }]}>{t('published')}: {book.publishedDate}</Text>
+              )}
+              {book.isbn && (
+                <Text style={[styles.bookMeta, { color: theme.textMuted }]}>ISBN: {book.isbn}</Text>
+              )}
 
+              <View style={styles.linkRow}>
                 <TouchableOpacity
-                    onPress={() => Linking.openURL(book.link)}
-                    className="flex-row items-center mt-2 bg-slate-100 dark:bg-slate-800 self-start px-3 py-2 rounded-lg"
+                  onPress={() => Linking.openURL(book.link)}
+                  style={[styles.linkButton, { backgroundColor: theme.inputBg }]}
                 >
-                    <ExternalLink size={14} className="text-blue-600 mr-2" color="#2563eb" />
-                    <Text className="text-blue-600 dark:text-blue-400 text-sm font-bold">Google Books</Text>
+                  <ExternalLink size={14} color="#3b82f6" />
+                  <Text style={styles.googleLinkText}>Google</Text>
                 </TouchableOpacity>
-            </View>
-        </View>
 
-        <View className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-4 mb-8">
-            <View>
-                <View className="flex-row items-center mb-2">
-                    <Tag size={16} className="text-amber-600 mr-2" color="#d97706" />
-                    <Text className="font-bold text-slate-700 dark:text-slate-300">Tags</Text>
-                </View>
-                <TextInput
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-800 dark:text-slate-100"
-                    placeholder="history, favorite, to-read (comma separated)"
-                    placeholderTextColor="#94a3b8"
-                    value={tagsInput}
-                    onChangeText={setTagsInput}
-                />
+                {amazonUrl && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(amazonUrl)}
+                    style={[styles.linkButton, { backgroundColor: '#ff9900' }]}
+                  >
+                    <ShoppingCart size={14} color="white" />
+                    <Text style={styles.amazonLinkText}>Amazon</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.formCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            <View style={styles.formSection}>
+              <View style={styles.formLabel}>
+                <Tag size={16} color={theme.primary} />
+                <Text style={[styles.formLabelText, { color: theme.text }]}>{t('tags')}</Text>
+              </View>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                placeholder={t('tagsPlaceholder')}
+                placeholderTextColor={theme.textMuted}
+                value={tagsInput}
+                onChangeText={setTagsInput}
+              />
             </View>
 
-            <View>
-                <View className="flex-row items-center mb-2">
-                    <MessageSquare size={16} className="text-amber-600 mr-2" color="#d97706" />
-                    <Text className="font-bold text-slate-700 dark:text-slate-300">My Thoughts</Text>
-                </View>
-                <TextInput
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-800 dark:text-slate-100 min-h-[100px]"
-                    placeholder="Write your impressions here..."
-                    placeholderTextColor="#94a3b8"
-                    value={comment}
-                    onChangeText={setComment}
-                    multiline
-                    textAlignVertical="top"
-                />
+            <View style={styles.formSection}>
+              <View style={styles.formLabel}>
+                <MessageSquare size={16} color={theme.primary} />
+                <Text style={[styles.formLabelText, { color: theme.text }]}>{t('myThoughts')}</Text>
+              </View>
+              <TextInput
+                style={[styles.input, styles.textArea, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                placeholder={t('thoughtsPlaceholder')}
+                placeholderTextColor={theme.textMuted}
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                textAlignVertical="top"
+              />
             </View>
-        </View>
+          </View>
 
-        <View className="gap-3 mb-10">
-            <TouchableOpacity
-                onPress={handleSave}
-                className="bg-amber-600 hover:bg-amber-700 p-4 rounded-xl flex-row items-center justify-center shadow-sm"
-            >
-                <Save color="white" size={20} className="mr-2" />
-                <Text className="text-white font-bold text-lg">{isSaved ? 'Update Library' : 'Save to Library'}</Text>
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={handleSave} style={[styles.saveButton, { backgroundColor: theme.primary }]}>
+              <Save color="white" size={20} />
+              <Text style={styles.saveButtonText}>{isSaved ? t('updateLibrary') : t('saveToLibrary')}</Text>
             </TouchableOpacity>
 
             {isSaved && (
-                <TouchableOpacity
-                    onPress={handleDelete}
-                    className="bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900 p-4 rounded-xl flex-row items-center justify-center"
-                >
-                    <Trash2 color="#ef4444" size={20} className="mr-2" />
-                    <Text className="text-red-500 font-bold text-lg">Remove from Library</Text>
-                </TouchableOpacity>
+              <TouchableOpacity onPress={handleDelete} style={[styles.deleteButton, { backgroundColor: theme.card, borderColor: theme.dangerLight }]}>
+                <Trash2 color={theme.danger} size={20} />
+                <Text style={[styles.deleteButtonText, { color: theme.danger }]}>{t('removeFromLibrary')}</Text>
+              </TouchableOpacity>
             )}
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  bookHeader: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  thumbnailContainer: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  noImage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noImageText: {},
+  bookInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  bookTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    lineHeight: 24,
+  },
+  bookAuthor: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  bookMeta: {
+    fontSize: 12,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  googleLinkText: {
+    color: '#3b82f6',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  amazonLinkText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  formCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 24,
+    gap: 16,
+  },
+  formSection: {
+    gap: 8,
+  },
+  formLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  formLabelText: {
+    fontWeight: 'bold',
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+  },
+  textArea: {
+    minHeight: 100,
+  },
+  actions: {
+    gap: 12,
+    marginBottom: 40,
+  },
+  saveButton: {
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  deleteButton: {
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+});

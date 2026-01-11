@@ -2,14 +2,11 @@ export interface Book {
   id: string;
   title: string;
   authors: string[];
-  thumbnail?: string;
-  link: string;
-  isbn?: string; // Additional field for scanning match
-  description?: string;
   publishedDate?: string;
-
-  // User added fields
+  description?: string;
+  thumbnail?: string;
+  isbn?: string;
+  link: string;
   tags?: string[];
   comment?: string;
-  savedAt?: number;
 }

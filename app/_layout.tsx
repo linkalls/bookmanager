@@ -1,21 +1,63 @@
-import '../global.css';
-import { Stack } from 'expo-router';
-import { View } from 'react-native';
-import { useColorScheme } from 'nativewind';
-import { useEffect } from 'react';
-import * as SystemUI from 'expo-system-ui'; // Or similar if needed for root background
+import { Tabs } from 'expo-router';
+import { LogBox, View, Text } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppProvider, useApp } from '../src/context/AppContext';
+import { Home, Library, Settings } from 'lucide-react-native';
 
-export default function Layout() {
-  const { colorScheme } = useColorScheme();
+LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
+
+function TabsLayout() {
+  const { theme, t } = useApp();
 
   return (
-    <View className="flex-1 bg-white dark:bg-slate-900">
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: 'transparent' },
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: theme.card,
+          borderTopColor: theme.cardBorder,
+        },
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textMuted,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: t('search'),
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-    </View>
+      <Tabs.Screen
+        name="library"
+        options={{
+          title: t('myLibrary'),
+          tabBarIcon: ({ color, size }) => <Library color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t('settings'),
+          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="book/[id]"
+        options={{
+          href: null,
+        }}
+      />
+    </Tabs>
+  );
+}
+
+export default function Layout() {
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <TabsLayout />
+      </AppProvider>
+    </SafeAreaProvider>
   );
 }

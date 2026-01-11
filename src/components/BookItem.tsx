@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Book as BookType } from '../types';
-import { Book as BookIcon, Check, ExternalLink, Trash2 } from 'lucide-react-native';
-import { Link, useRouter } from 'expo-router';
+import { Book as BookIcon, Check, Trash2, ShoppingCart } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
+import { useApp } from '../context/AppContext';
+import { getAmazonUrl } from '../utils/isbn';
 
 interface BookItemProps {
   book: BookType;
@@ -15,45 +17,48 @@ interface BookItemProps {
 
 export function BookItem({ book, isSaved, onToggleSave, onRemove, compact = false }: BookItemProps) {
   const router = useRouter();
+  const { theme, isDark, t } = useApp();
+  const amazonUrl = getAmazonUrl(book.isbn);
 
   const handlePress = () => {
-    // Navigate to details
-    // If it's saved, we pass ID to look up in storage? Or pass params?
-    // Passing params is easier but limited size. ID is better if we have global state.
-    // For now, let's just pass the book object as params stringified or just ID if we rely on context.
-    // Since useBooks is a hook, state is not global.
-    // We should probably pass the book data via params for search results.
-    // For saved books, we can lookup by ID.
-    // Let's pass all book data as params for simplicity in this small app.
     router.push({
-        pathname: "/book/[id]",
-        params: { id: book.id, bookData: JSON.stringify(book) }
+      pathname: "/book/[id]",
+      params: { id: book.id, bookData: JSON.stringify(book) }
     });
   };
 
   if (compact) {
     return (
-      <TouchableOpacity
-        onPress={handlePress}
-        className="bg-white dark:bg-slate-800 p-3 flex-row gap-3 items-center border-b border-slate-100 dark:border-slate-700"
+      <TouchableOpacity 
+        onPress={handlePress} 
+        style={[styles.compactContainer, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}
       >
-        <View className="w-10 h-14 bg-slate-100 dark:bg-slate-700 rounded overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-600">
+        <View style={[styles.compactThumbnail, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
           {book.thumbnail ? (
-            <Image source={{ uri: book.thumbnail }} className="w-full h-full" resizeMode="cover" />
+            <Image source={{ uri: book.thumbnail }} style={styles.compactImage} resizeMode="cover" />
           ) : (
-            <BookIcon className="text-slate-300 dark:text-slate-500" size={16} />
+            <BookIcon color={theme.textMuted} size={16} />
           )}
         </View>
-        <View className="flex-1 min-w-0">
-          <Text className="font-bold text-slate-800 dark:text-slate-100 text-sm" numberOfLines={1}>{book.title}</Text>
-          <Text className="text-xs text-slate-500 dark:text-slate-400" numberOfLines={1}>{book.authors.join(', ')}</Text>
+        <View style={styles.compactInfo}>
+          <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{book.title}</Text>
+          <Text style={[styles.compactAuthor, { color: theme.textSecondary }]} numberOfLines={1}>{book.authors.join(', ')}</Text>
+          {book.tags && book.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {book.tags.slice(0, 3).map((tag, idx) => (
+                <View key={idx} style={[styles.tagBadge, { backgroundColor: theme.tagBg }]}>
+                  <Text style={[styles.tagText, { color: theme.tagText }]}>{tag}</Text>
+                </View>
+              ))}
+              {book.tags.length > 3 && (
+                <Text style={[styles.moreText, { color: theme.textMuted }]}>+{book.tags.length - 3}</Text>
+              )}
+            </View>
+          )}
         </View>
         {onRemove && (
-          <TouchableOpacity
-            onPress={() => onRemove(book.id)}
-            className="p-2"
-          >
-            <Trash2 size={16} className="text-slate-400 hover:text-red-500" color="#94a3b8" />
+          <TouchableOpacity onPress={() => onRemove(book.id)} style={styles.removeButton}>
+            <Trash2 size={16} color={theme.danger} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -61,61 +66,218 @@ export function BookItem({ book, isSaved, onToggleSave, onRemove, compact = fals
   }
 
   return (
-    <View className={`bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex-row gap-3 mb-3 ${isSaved ? 'border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-900/10' : ''}`}>
-        {/* Thumbnail */}
-        <TouchableOpacity onPress={handlePress} className="w-20 h-28 bg-slate-100 dark:bg-slate-700 rounded overflow-hidden relative">
-            {book.thumbnail ? (
-            <Image source={{ uri: book.thumbnail }} className="w-full h-full" resizeMode="cover" />
-            ) : (
-            <View className="flex-1 items-center justify-center">
-                <BookIcon className="text-slate-300 dark:text-slate-500" size={32} />
-            </View>
-            )}
-            {isSaved && (
-            <View className="absolute top-0 right-0 bg-green-500 p-1 rounded-bl shadow-sm">
-                <Check size={12} color="white" />
-            </View>
-            )}
+    <View style={[
+      styles.container, 
+      { backgroundColor: theme.card, borderColor: isSaved ? theme.successLight : theme.cardBorder }
+    ]}>
+      <TouchableOpacity onPress={handlePress} style={[styles.thumbnail, { backgroundColor: theme.inputBg }]}>
+        {book.thumbnail ? (
+          <Image source={{ uri: book.thumbnail }} style={styles.image} resizeMode="cover" />
+        ) : (
+          <View style={styles.noImage}>
+            <BookIcon color={theme.textMuted} size={32} />
+          </View>
+        )}
+        {isSaved && (
+          <View style={styles.savedBadge}>
+            <Check size={12} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.info}>
+        <TouchableOpacity onPress={handlePress}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>{book.title}</Text>
+          <Text style={[styles.author, { color: theme.textSecondary }]} numberOfLines={1}>{book.authors.join(', ')}</Text>
         </TouchableOpacity>
 
-        {/* Info */}
-        <View className="flex-1 justify-between py-1">
-            <TouchableOpacity onPress={handlePress}>
-                <Text className="font-bold text-slate-800 dark:text-slate-100 text-base leading-tight mb-1" numberOfLines={2}>
-                    {book.title}
-                </Text>
-                <Text className="text-sm text-slate-600 dark:text-slate-400" numberOfLines={1}>
-                    {book.authors.join(', ')}
-                </Text>
+        {book.tags && book.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {book.tags.slice(0, 2).map((tag, idx) => (
+              <View key={idx} style={[styles.tagBadge, { backgroundColor: theme.tagBg }]}>
+                <Text style={[styles.tagText, { color: theme.tagText }]}>{tag}</Text>
+              </View>
+            ))}
+            {book.tags.length > 2 && (
+              <Text style={[styles.moreText, { color: theme.textMuted }]}>+{book.tags.length - 2}</Text>
+            )}
+          </View>
+        )}
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            onPress={() => onToggleSave(book)}
+            style={[styles.saveButton, isSaved ? { backgroundColor: theme.successLight } : { backgroundColor: '#4f46e5' }]}
+          >
+            {isSaved ? (
+              <>
+                <Check size={14} color={isDark ? '#4ade80' : '#15803d'} />
+                <Text style={[styles.savedText, { color: isDark ? '#4ade80' : '#15803d' }]}>{t('saved')}</Text>
+              </>
+            ) : (
+              <Text style={styles.saveText}>{t('save')}</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => Linking.openURL(book.link)}
+            style={[styles.linkButton, { backgroundColor: theme.inputBg }]}
+          >
+            <Text style={[styles.linkButtonText, { color: '#3b82f6' }]}>G</Text>
+          </TouchableOpacity>
+
+          {amazonUrl && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(amazonUrl)}
+              style={[styles.linkButton, { backgroundColor: '#ff9900' }]}
+            >
+              <ShoppingCart size={14} color="white" />
             </TouchableOpacity>
-
-            <View className="flex-row gap-2 mt-2">
-                <TouchableOpacity
-                    onPress={() => onToggleSave(book)}
-                    className={`flex-1 py-2 px-3 rounded-lg flex-row items-center justify-center gap-1 ${
-                        isSaved
-                        ? 'bg-green-100 dark:bg-green-900/50'
-                        : 'bg-indigo-600 dark:bg-indigo-500'
-                    }`}
-                >
-                    {isSaved ? (
-                        <>
-                            <Check size={14} color="#15803d" />
-                            <Text className="text-green-700 dark:text-green-400 text-xs font-bold">Saved</Text>
-                        </>
-                    ) : (
-                        <Text className="text-white text-xs font-bold">Save</Text>
-                    )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    onPress={() => Linking.openURL(book.link)}
-                    className="px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg items-center justify-center"
-                >
-                    <ExternalLink size={16} className="text-slate-500 dark:text-slate-400" color="#64748b" />
-                </TouchableOpacity>
-            </View>
+          )}
         </View>
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  thumbnail: {
+    width: 80,
+    height: 112,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  noImage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#22c55e',
+    padding: 4,
+    borderBottomLeftRadius: 8,
+  },
+  info: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  title: {
+    fontWeight: 'bold',
+    fontSize: 15,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  author: {
+    fontSize: 13,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 6,
+  },
+  tagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  moreText: {
+    fontSize: 10,
+    marginLeft: 2,
+    alignSelf: 'center',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  savedText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  saveText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  linkButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  compactContainer: {
+    padding: 12,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+  },
+  compactThumbnail: {
+    width: 40,
+    height: 56,
+    borderRadius: 4,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  compactImage: {
+    width: '100%',
+    height: '100%',
+  },
+  compactInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  compactTitle: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  compactAuthor: {
+    fontSize: 12,
+  },
+  removeButton: {
+    padding: 8,
+  },
+});

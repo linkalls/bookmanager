@@ -1,24 +1,18 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, StatusBar, Image, ScrollView, Platform } from 'react-native';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StatusBar, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBooks } from '../src/hooks/useBooks';
 import { BookItem } from '../src/components/BookItem';
 import { Scanner } from '../src/components/Scanner';
-import { Search, Camera, Library, Moon, Sun, Loader2 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
+import { Search, Camera, X } from 'lucide-react-native';
+import { useApp } from '../src/context/AppContext';
 
 export default function HomeScreen() {
-  const { savedBooks, loadSavedBooks, saveBook, removeBook, isSaved, searchBooks, loading, error } = useBooks();
+  const { saveBook, isSaved, searchBooks, loading, error } = useBooks();
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
-  const { colorScheme, toggleColorScheme } = useColorScheme();
-
-  useFocusEffect(
-    useCallback(() => {
-      loadSavedBooks();
-    }, [loadSavedBooks])
-  );
+  const { theme, isDark, t } = useApp();
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -33,129 +27,111 @@ export default function HomeScreen() {
     setSearchResults(results);
   };
 
+  const clearResults = () => {
+    setSearchResults([]);
+    setQuery('');
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
-      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View className="bg-amber-900 px-4 py-3 flex-row justify-between items-center shadow-md z-10">
-        <View className="flex-row items-center gap-2">
-            <Library color="#fffbeb" size={24} />
-            <Text className="text-amber-50 text-lg font-bold">Poteto's Library DX</Text>
-        </View>
-        <TouchableOpacity onPress={toggleColorScheme} className="p-2">
-            {colorScheme === 'dark' ? (
-                <Sun color="#fbbf24" size={20} />
-            ) : (
-                <Moon color="#fffbeb" size={20} />
-            )}
-        </TouchableOpacity>
+      <View style={[styles.header, { backgroundColor: theme.header, borderBottomColor: theme.cardBorder }]}>
+        <Text style={[styles.headerTitle, { color: theme.headerText }]}>{t('appName')}</Text>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 80 }}>
-        <View className="p-4 space-y-6">
-            {/* Search Section */}
-            <View className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border-2 border-amber-100 dark:border-slate-700 p-4">
-                <View className="flex-row gap-2 mb-2">
-                    <View className="flex-1 relative justify-center">
-                        <View className="absolute left-3 z-10">
-                             <Search color="#94a3b8" size={20} />
-                        </View>
-                        <TextInput
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white text-base"
-                            placeholder="Title, Author, ISBN..."
-                            placeholderTextColor="#94a3b8"
-                            value={query}
-                            onChangeText={setQuery}
-                            onSubmitEditing={handleSearch}
-                            returnKeyType="search"
-                        />
-                    </View>
-                </View>
-
-                <View className="flex-row gap-2">
-                    <TouchableOpacity
-                        onPress={() => setIsScannerVisible(true)}
-                        className="bg-slate-800 dark:bg-slate-700 p-3 rounded-xl flex-row items-center justify-center gap-2 flex-1"
-                    >
-                        <Camera color="white" size={20} />
-                        <Text className="text-white font-bold">Scan</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={handleSearch}
-                        disabled={loading}
-                        className="bg-amber-600 dark:bg-amber-700 p-3 rounded-xl flex-row items-center justify-center gap-2 flex-1"
-                    >
-                        {loading ? (
-                             <ActivityIndicator color="white" />
-                        ) : (
-                             <Text className="text-white font-bold">Search</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                {error && (
-                    <Text className="text-red-500 mt-2 text-sm">{error}</Text>
-                )}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Search Section */}
+        <View style={[styles.searchCard, { backgroundColor: theme.searchCard, borderColor: theme.searchCardBorder }]}>
+          <View style={styles.searchInputContainer}>
+            <View style={styles.searchIconContainer}>
+              <Search color={theme.textMuted} size={20} />
             </View>
+            <TextInput
+              style={[styles.searchInput, { 
+                backgroundColor: theme.inputBg, 
+                borderColor: theme.inputBorder,
+                color: theme.text 
+              }]}
+              placeholder={t('searchPlaceholder')}
+              placeholderTextColor={theme.textMuted}
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+          </View>
 
-            {/* Results Section */}
-            <View>
-                 <View className="flex-row items-center mb-3">
-                    <Search size={20} className="text-amber-600 mr-2" color="#d97706" />
-                    <Text className="text-lg font-bold text-slate-700 dark:text-slate-200">Results</Text>
-                 </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              onPress={() => setIsScannerVisible(true)}
+              style={[styles.scanButton, { backgroundColor: isDark ? '#475569' : '#1e293b' }]}
+            >
+              <Camera color="white" size={20} />
+              <Text style={styles.buttonText}>{t('scan')}</Text>
+            </TouchableOpacity>
 
-                 {searchResults.length === 0 && !loading && (
-                     <View className="p-8 items-center bg-slate-50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                         <Text className="text-slate-400 text-center">Enter keywords or scan a barcode to search</Text>
-                     </View>
-                 )}
+            <TouchableOpacity
+              onPress={handleSearch}
+              disabled={loading}
+              style={[styles.searchButton, { backgroundColor: theme.primary }]}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>{t('search')}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
-                 {searchResults.map(book => (
-                     <BookItem
-                        key={book.id}
-                        book={book}
-                        isSaved={isSaved(book.id)}
-                        onToggleSave={saveBook}
-                     />
-                 ))}
-            </View>
-
-            {/* Library Section */}
-            <View>
-                <View className="flex-row items-center justify-between mb-3 bg-white dark:bg-slate-900 py-2 z-10">
-                     <View className="flex-row items-center">
-                        <Library size={20} className="text-amber-600 mr-2" color="#d97706" />
-                        <Text className="text-lg font-bold text-slate-700 dark:text-slate-200">My Library</Text>
-                     </View>
-                     <View className="bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded-full">
-                         <Text className="text-amber-800 dark:text-amber-100 text-xs font-bold">{savedBooks.length} books</Text>
-                     </View>
-                </View>
-
-                <View className="bg-amber-50 dark:bg-slate-800/50 rounded-2xl border border-amber-200 dark:border-slate-700 overflow-hidden min-h-[100px]">
-                    {savedBooks.length === 0 ? (
-                        <View className="p-8 items-center">
-                            <Library size={48} className="text-amber-800/20" color="#92400e20" />
-                            <Text className="text-amber-800/40 dark:text-slate-500 mt-2">Library is empty</Text>
-                        </View>
-                    ) : (
-                        savedBooks.map(book => (
-                            <BookItem
-                                key={`saved-${book.id}`}
-                                book={book}
-                                isSaved={true}
-                                onToggleSave={() => {}} // No toggle here, usually just remove
-                                onRemove={removeBook}
-                                compact={true}
-                            />
-                        ))
-                    )}
-                </View>
-            </View>
+          {error && (
+            <Text style={styles.errorText}>{t('searchFailed')}</Text>
+          )}
         </View>
+
+        {/* Results Section */}
+        {(searchResults.length > 0 || loading) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeader}>
+                <Search size={20} color={theme.primary} />
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('results')}</Text>
+                <View style={[styles.badge, { backgroundColor: theme.primaryLight }]}>
+                  <Text style={[styles.badgeText, { color: theme.primary }]}>{searchResults.length}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={clearResults} style={styles.clearButton}>
+                <X size={20} color={theme.textMuted} />
+                <Text style={[styles.clearButtonText, { color: theme.textMuted }]}>{t('clear')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {searchResults.map(book => (
+              <BookItem
+                key={book.id}
+                book={book}
+                isSaved={isSaved(book.id)}
+                onToggleSave={saveBook}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Empty state */}
+        {searchResults.length === 0 && !loading && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Search size={20} color={theme.primary} />
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('search')}</Text>
+            </View>
+            <View style={[styles.emptyState, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>
+                {t('searchHint')}
+              </Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       <Scanner
@@ -166,3 +142,127 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 20,
+  },
+  searchCard: {
+    borderRadius: 16,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 24,
+  },
+  searchInputContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  searchIconContainer: {
+    position: 'absolute',
+    left: 12,
+    top: 14,
+    zIndex: 1,
+  },
+  searchInput: {
+    width: '100%',
+    paddingLeft: 40,
+    paddingRight: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    fontSize: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  scanButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  searchButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#ef4444',
+    marginTop: 8,
+    fontSize: 14,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 8,
+  },
+  clearButtonText: {
+    fontSize: 14,
+  },
+  emptyState: {
+    padding: 32,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  emptyStateText: {
+    textAlign: 'center',
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});
