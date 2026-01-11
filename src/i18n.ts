@@ -59,6 +59,7 @@ export const translations = {
     importConfirm: '現在のデータを上書きしますか？',
     dataManagement: 'データ管理',
     version: 'バージョン',
+    next: '次へ',
   },
   en: {
     appName: 'Bookshelf',
@@ -120,6 +121,7 @@ export const translations = {
     importConfirm: 'Overwrite current data?',
     dataManagement: 'Data',
     version: 'Version',
+    next: 'Next',
   },
 };
 

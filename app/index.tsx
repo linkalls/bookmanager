@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBooks } from '../src/hooks/useBooks';
 import { BookItem } from '../src/components/BookItem';
 import { Scanner } from '../src/components/Scanner';
-import { Search, Camera, X } from 'lucide-react-native';
+import { Search, Camera, X, ChevronDown } from 'lucide-react-native';
 import { useApp } from '../src/context/AppContext';
 
 export default function HomeScreen() {
@@ -12,24 +12,37 @@ export default function HomeScreen() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [startIndex, setStartIndex] = useState(0);
   const { theme, isDark, t } = useApp();
 
   const handleSearch = async () => {
     if (!query.trim()) return;
-    const results = await searchBooks(query);
+    setStartIndex(0);
+    const results = await searchBooks(query, 0);
     setSearchResults(results);
+  };
+
+  const loadMore = async () => {
+    const nextIndex = startIndex + 10;
+    const newResults = await searchBooks(query, nextIndex);
+    if (newResults.length > 0) {
+      setSearchResults(prev => [...prev, ...newResults]);
+      setStartIndex(nextIndex);
+    }
   };
 
   const handleScan = async (isbn: string) => {
     setIsScannerVisible(false);
     setQuery(isbn);
-    const results = await searchBooks(isbn);
+    setStartIndex(0);
+    const results = await searchBooks(isbn, 0);
     setSearchResults(results);
   };
 
   const clearResults = () => {
     setSearchResults([]);
     setQuery('');
+    setStartIndex(0);
   };
 
   return (
@@ -77,7 +90,7 @@ export default function HomeScreen() {
               disabled={loading}
               style={[styles.searchButton, { backgroundColor: theme.primary }]}
             >
-              {loading ? (
+              {loading && startIndex === 0 ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={styles.buttonText}>{t('search')}</Text>
@@ -91,7 +104,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Results Section */}
-        {(searchResults.length > 0 || loading) && (
+        {(searchResults.length > 0 || (loading && startIndex === 0)) && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionHeader}>
@@ -107,14 +120,32 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {searchResults.map(book => (
+            {searchResults.map((book, index) => (
               <BookItem
-                key={book.id}
+                key={`${book.id}-${index}`}
                 book={book}
                 isSaved={isSaved(book.id)}
                 onToggleSave={saveBook}
               />
             ))}
+
+            {/* Next Button */}
+            {searchResults.length > 0 && (
+              <TouchableOpacity
+                onPress={loadMore}
+                disabled={loading}
+                style={[styles.loadMoreButton, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+              >
+                {loading ? (
+                   <ActivityIndicator color={theme.primary} />
+                ) : (
+                  <>
+                    <Text style={[styles.loadMoreText, { color: theme.text }]}>{t('next') || 'Next'}</Text>
+                    <ChevronDown size={20} color={theme.text} />
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -264,5 +295,19 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    gap: 8,
+  },
+  loadMoreText: {
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

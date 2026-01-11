@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { LogBox, View, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../src/context/AppContext';
+import { BooksProvider } from '../src/context/BooksContext';
 import { Home, Library, Settings } from 'lucide-react-native';
 
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
@@ -11,6 +12,7 @@ function TabsLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -56,7 +58,9 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <TabsLayout />
+        <BooksProvider>
+          <TabsLayout />
+        </BooksProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

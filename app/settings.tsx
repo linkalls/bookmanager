@@ -22,7 +22,9 @@ export default function SettingsScreen() {
       }
       
       const fileName = `bookshelf_backup_${new Date().toISOString().split('T')[0]}.json`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      // Use legacy document directory if available, or cast to any to access Paths if using new API
+      const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory;
+      const filePath = `${docDir}${fileName}`;
       
       await FileSystem.writeAsStringAsync(filePath, data);
       
