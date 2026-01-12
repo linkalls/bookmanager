@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings, Globe, Moon, Sun, Monitor, Check, Download, Upload } from 'lucide-react-native';
 import { useApp } from '../src/context/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -22,14 +22,12 @@ export default function SettingsScreen() {
       }
       
       const fileName = `bookshelf_backup_${new Date().toISOString().split('T')[0]}.json`;
-      // Use legacy document directory if available, or cast to any to access Paths if using new API
-      const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory;
-      const filePath = `${docDir}${fileName}`;
+      const file = new ExpoFile(Paths.document, fileName);
       
-      await FileSystem.writeAsStringAsync(filePath, data);
+      await file.write(data);
       
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(filePath);
+        await Sharing.shareAsync(file.uri);
       } else {
         await Share.share({ message: data });
       }
@@ -50,8 +48,9 @@ export default function SettingsScreen() {
       
       if (result.canceled) return;
       
-      const file = result.assets[0];
-      const content = await FileSystem.readAsStringAsync(file.uri);
+      const asset = result.assets[0];
+      const file = new ExpoFile(asset.uri);
+      const content = await file.text();
       
       // Validate JSON
       JSON.parse(content);
