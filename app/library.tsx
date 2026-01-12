@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView, StyleSh
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBooks } from '../src/hooks/useBooks';
 import { BookItem } from '../src/components/BookItem';
+import { Book } from '../src/types';
 import { Library, Search, Tag, ChevronDown, ChevronUp, X, SortAsc, SortDesc } from 'lucide-react-native';
 import { useApp } from '../src/context/AppContext';
 
@@ -15,6 +16,7 @@ export default function LibraryScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | Book['status']>('all');
   const [showAllTags, setShowAllTags] = useState(false);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -33,6 +35,14 @@ export default function LibraryScreen() {
   const filteredBooks = useMemo(() => {
     let books = [...savedBooks];
     
+    // Filter by status
+    if (statusFilter !== 'all') {
+      books = books.filter(book => {
+        const status = book.status || 'want_to_read';
+        return status === statusFilter;
+      });
+    }
+
     // Filter by tag
     if (selectedTag) {
       books = books.filter(book => book.tags?.includes(selectedTag));
@@ -149,6 +159,34 @@ export default function LibraryScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={[styles.statusTabs, { backgroundColor: theme.background, borderBottomColor: theme.cardBorder }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusTabsContent}>
+          {[
+            { id: 'all', label: t('all') || 'All' },
+            { id: 'reading', label: t('reading') || 'Reading' },
+            { id: 'want_to_read', label: t('wantToRead') || 'To Read' },
+            { id: 'completed', label: t('completed') || 'Done' },
+            { id: 'dropped', label: t('dropped') || 'Dropped' },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => setStatusFilter(tab.id as any)}
+              style={[
+                styles.statusTab,
+                statusFilter === tab.id && { borderBottomColor: theme.primary }
+              ]}
+            >
+              <Text style={[
+                styles.statusTabText,
+                { color: statusFilter === tab.id ? theme.primary : theme.textSecondary }
+              ]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Tags Filter */}
@@ -307,6 +345,22 @@ const styles = StyleSheet.create({
   },
   sortMenuText: {
     fontSize: 14,
+  },
+  statusTabs: {
+    borderBottomWidth: 1,
+  },
+  statusTabsContent: {
+    paddingHorizontal: 16,
+  },
+  statusTab: {
+    paddingVertical: 12,
+    marginRight: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  statusTabText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
