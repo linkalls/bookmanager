@@ -3,7 +3,7 @@ import { LogBox, View, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../src/context/AppContext';
 import { BooksProvider } from '../src/context/BooksContext';
-import { Home, Library, Settings } from 'lucide-react-native';
+import { Home, Library, Settings, BarChart2 } from 'lucide-react-native';
 
 LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
 
@@ -35,6 +35,13 @@ function TabsLayout() {
         options={{
           title: t('myLibrary'),
           tabBarIcon: ({ color, size }) => <Library color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: t('statistics'),
+          tabBarIcon: ({ color, size }) => <BarChart2 color={color} size={size} />,
         }}
       />
       <Tabs.Screen

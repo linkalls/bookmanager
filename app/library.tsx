@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView, StyleSh
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBooks } from '../src/hooks/useBooks';
 import { BookItem } from '../src/components/BookItem';
-import { Library, Search, Tag, ChevronDown, ChevronUp, X, SortAsc, SortDesc } from 'lucide-react-native';
+import { Library, Search, Tag, ChevronDown, ChevronUp, X, SortAsc, SortDesc, BookOpen, Check, Clock, XCircle, Filter } from 'lucide-react-native';
 import { useApp } from '../src/context/AppContext';
+import { ReadingStatus } from '../src/types';
 
-type SortField = 'title' | 'author' | 'date';
+type SortField = 'title' | 'author' | 'date' | 'rating' | 'progress';
 type SortOrder = 'asc' | 'desc';
+type StatusFilter = ReadingStatus | 'all' | 'lent';
 
 export default function LibraryScreen() {
   const { savedBooks, removeBook } = useBooks();
@@ -19,6 +21,7 @@ export default function LibraryScreen() {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   // Get all unique tags
   const allTags = useMemo(() => {
@@ -28,10 +31,31 @@ export default function LibraryScreen() {
     });
     return Array.from(tags).sort();
   }, [savedBooks]);
+  
+  // Status counts
+  const statusCounts = useMemo(() => {
+    return {
+      all: savedBooks.length,
+      want_to_read: savedBooks.filter(b => b.status === 'want_to_read').length,
+      reading: savedBooks.filter(b => b.status === 'reading').length,
+      completed: savedBooks.filter(b => b.status === 'completed').length,
+      dropped: savedBooks.filter(b => b.status === 'dropped').length,
+      lent: savedBooks.filter(b => b.lendingStatus?.borrower).length,
+    };
+  }, [savedBooks]);
 
   // Filter and sort books
   const filteredBooks = useMemo(() => {
     let books = [...savedBooks];
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'lent') {
+        books = books.filter(book => book.lendingStatus?.borrower);
+      } else {
+        books = books.filter(book => book.status === statusFilter);
+      }
+    }
     
     // Filter by tag
     if (selectedTag) {
@@ -58,6 +82,14 @@ export default function LibraryScreen() {
         case 'author':
           comparison = (a.authors[0] || '').localeCompare(b.authors[0] || '');
           break;
+        case 'rating':
+          comparison = (a.rating || 0) - (b.rating || 0);
+          break;
+        case 'progress':
+          const progressA = a.totalPages ? ((a.currentPage || 0) / a.totalPages) : 0;
+          const progressB = b.totalPages ? ((b.currentPage || 0) / b.totalPages) : 0;
+          comparison = progressA - progressB;
+          break;
         case 'date':
         default:
           comparison = 0; // Keep original order for date (newest first)
@@ -67,7 +99,7 @@ export default function LibraryScreen() {
     });
     
     return books;
-  }, [savedBooks, selectedTag, searchQuery, sortField, sortOrder]);
+  }, [savedBooks, selectedTag, searchQuery, sortField, sortOrder, statusFilter]);
 
   const displayTags = showAllTags ? allTags : allTags.slice(0, 5);
 
@@ -80,6 +112,15 @@ export default function LibraryScreen() {
     }
     setShowSortMenu(false);
   };
+  
+  const statusTabs: { value: StatusFilter; label: string; icon: React.ReactNode; color: string }[] = [
+    { value: 'all', label: t('all'), icon: null, color: theme.primary },
+    { value: 'want_to_read', label: t('wantToRead'), icon: <Clock size={14} color="#3b82f6" />, color: '#3b82f6' },
+    { value: 'reading', label: t('reading'), icon: <BookOpen size={14} color="#f59e0b" />, color: '#f59e0b' },
+    { value: 'completed', label: t('completed'), icon: <Check size={14} color="#22c55e" />, color: '#22c55e' },
+    { value: 'dropped', label: t('dropped'), icon: <XCircle size={14} color="#ef4444" />, color: '#ef4444' },
+    { value: 'lent', label: t('lentBooks'), icon: null, color: '#8b5cf6' },
+  ];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
@@ -95,6 +136,47 @@ export default function LibraryScreen() {
           <Text style={[styles.countText, { color: theme.primary }]}>{savedBooks.length} {t('books')}</Text>
         </View>
       </View>
+      
+      {/* Status Tabs */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={[styles.statusTabs, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}
+        contentContainerStyle={styles.statusTabsContent}
+      >
+        {statusTabs.map((tab) => {
+          const count = statusCounts[tab.value as keyof typeof statusCounts] || 0;
+          const isActive = statusFilter === tab.value;
+          return (
+            <TouchableOpacity
+              key={tab.value}
+              onPress={() => setStatusFilter(tab.value)}
+              style={[
+                styles.statusTab,
+                { 
+                  backgroundColor: isActive ? tab.color : 'transparent',
+                  borderColor: isActive ? tab.color : theme.inputBorder,
+                }
+              ]}
+            >
+              {tab.icon && React.cloneElement(tab.icon as React.ReactElement<any>, {
+                color: isActive ? '#fff' : tab.color
+              })}
+              <Text style={[
+                styles.statusTabText,
+                { color: isActive ? '#fff' : theme.text }
+              ]}>
+                {tab.label}
+              </Text>
+              <View style={[styles.statusCount, { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : theme.inputBg }]}>
+                <Text style={[styles.statusCountText, { color: isActive ? '#fff' : theme.textSecondary }]}>
+                  {count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       {/* Search & Sort Bar */}
       <View style={[styles.searchBar, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}>
@@ -147,6 +229,18 @@ export default function LibraryScreen() {
           >
             <Text style={[styles.sortMenuText, { color: theme.text }]}>{t('sortDate')}</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => toggleSort('rating')}
+            style={[styles.sortMenuItem, sortField === 'rating' && { backgroundColor: theme.primaryLight }]}
+          >
+            <Text style={[styles.sortMenuText, { color: theme.text }]}>{t('rating')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => toggleSort('progress')}
+            style={[styles.sortMenuItem, sortField === 'progress' && { backgroundColor: theme.primaryLight }]}
+          >
+            <Text style={[styles.sortMenuText, { color: theme.text }]}>{t('progress')}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -181,7 +275,7 @@ export default function LibraryScreen() {
                 ]}
               >
                 <Text style={[styles.tagChipText, { color: selectedTag === null ? '#fff' : theme.text }]}>
-                  {t('all')} ({savedBooks.length})
+                  {t('all')} ({filteredBooks.length})
                 </Text>
               </TouchableOpacity>
               
@@ -263,6 +357,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  statusTabs: {
+    borderBottomWidth: 1,
+    maxHeight: 56,
+  },
+  statusTabsContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  statusTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  statusTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statusCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  statusCountText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   searchBar: {
     flexDirection: 'row',
     padding: 12,
@@ -290,7 +418,7 @@ const styles = StyleSheet.create({
   },
   sortMenu: {
     position: 'absolute',
-    top: 130,
+    top: 180,
     right: 12,
     borderRadius: 8,
     borderWidth: 1,
