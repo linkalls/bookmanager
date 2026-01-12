@@ -9,4 +9,9 @@ export interface Book {
   link: string;
   tags?: string[];
   comment?: string;
+  status?: 'reading' | 'completed' | 'want_to_read' | 'dropped';
+  currentPage?: number;
+  totalPages?: number;
+  startDate?: string;
+  finishDate?: string;
 }

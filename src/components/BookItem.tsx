@@ -41,8 +41,33 @@ export function BookItem({ book, isSaved, onToggleSave, onRemove, compact = fals
           )}
         </View>
         <View style={styles.compactInfo}>
-          <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1}>{book.title}</Text>
-          <Text style={[styles.compactAuthor, { color: theme.textSecondary }]} numberOfLines={1}>{book.authors.join(', ')}</Text>
+          <Text style={[styles.compactTitle, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{book.title}</Text>
+          <Text style={[styles.compactAuthor, { color: theme.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">{book.authors.join(', ')}</Text>
+
+          {/* Progress Bar for compact view */}
+          {book.totalPages && book.currentPage ? (
+            <View style={styles.compactProgressContainer}>
+              <View style={[styles.compactProgressBar, { backgroundColor: theme.inputBorder }]}>
+                <View
+                  style={[
+                    styles.compactProgressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: `${Math.min(100, (book.currentPage / book.totalPages) * 100)}%`
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={[styles.compactProgressText, { color: theme.textSecondary }]}>
+                {Math.round((book.currentPage / book.totalPages) * 100)}%
+              </Text>
+            </View>
+          ) : book.status === 'reading' ? (
+             <View style={styles.statusBadge}>
+                <Text style={[styles.statusText, { color: theme.primary }]}>Reading</Text>
+             </View>
+          ) : null}
+
           {book.tags && book.tags.length > 0 && (
             <View style={styles.tagsRow}>
               {book.tags.slice(0, 3).map((tag, idx) => (
@@ -185,7 +210,7 @@ const styles = StyleSheet.create({
   title: {
     fontWeight: 'bold',
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 4,
   },
   author: {
@@ -273,9 +298,38 @@ const styles = StyleSheet.create({
   compactTitle: {
     fontWeight: 'bold',
     fontSize: 14,
+    lineHeight: 20,
   },
   compactAuthor: {
     fontSize: 12,
+    lineHeight: 18,
+  },
+  compactProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  compactProgressBar: {
+    height: 4,
+    flex: 1,
+    maxWidth: 100,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  compactProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  compactProgressText: {
+    fontSize: 10,
+  },
+  statusBadge: {
+    marginTop: 2,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   removeButton: {
     padding: 8,

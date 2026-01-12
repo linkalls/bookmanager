@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useBooks } from '../../src/hooks/useBooks';
 import { Book } from '../../src/types';
-import { ArrowLeft, Save, Trash2, Tag, MessageSquare, ExternalLink, ShoppingCart } from 'lucide-react-native';
+import { ArrowLeft, Save, Trash2, Tag, MessageSquare, ExternalLink, ShoppingCart, BookOpen, Calendar, CheckCircle } from 'lucide-react-native';
 import * as Linking from 'expo-linking';
 import { useApp } from '../../src/context/AppContext';
 import { getAmazonUrl } from '../../src/utils/isbn';
@@ -18,6 +18,14 @@ export default function BookDetailScreen() {
   const [book, setBook] = useState<Book | null>(null);
   const [tagsInput, setTagsInput] = useState('');
   const [comment, setComment] = useState('');
+
+  // New fields state
+  const [status, setStatus] = useState<Book['status']>('want_to_read');
+  const [currentPage, setCurrentPage] = useState('');
+  const [totalPages, setTotalPages] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [finishDate, setFinishDate] = useState('');
+
   const [isEditing, setIsEditing] = useState(false);
 
   const amazonUrl = book?.isbn ? getAmazonUrl(book.isbn) : null;
@@ -31,11 +39,21 @@ export default function BookDetailScreen() {
         setBook(savedVersion);
         setTagsInput(savedVersion.tags?.join(', ') || '');
         setComment(savedVersion.comment || '');
+        setStatus(savedVersion.status || 'want_to_read');
+        setCurrentPage(savedVersion.currentPage?.toString() || '');
+        setTotalPages(savedVersion.totalPages?.toString() || '');
+        setStartDate(savedVersion.startDate || '');
+        setFinishDate(savedVersion.finishDate || '');
         setIsEditing(true);
       } else {
         setBook(parsedBook);
         setTagsInput('');
         setComment('');
+        setStatus('want_to_read');
+        setCurrentPage('');
+        setTotalPages('');
+        setStartDate('');
+        setFinishDate('');
         setIsEditing(false);
       }
     }
@@ -45,10 +63,31 @@ export default function BookDetailScreen() {
     if (!book) return;
 
     const tags = tagsInput.split(',').map(tag => tag.trim()).filter(Boolean);
-    const updatedBook = {
+
+    // Auto-update status based on progress if currently want_to_read
+    let newStatus = status;
+    if (status === 'want_to_read' && currentPage && parseInt(currentPage) > 0) {
+      newStatus = 'reading';
+      setStatus('reading');
+    }
+    if (status === 'reading' && currentPage && totalPages && currentPage === totalPages) {
+       newStatus = 'completed';
+       setStatus('completed');
+       if (!finishDate) {
+         const today = new Date().toISOString().split('T')[0];
+         setFinishDate(today);
+       }
+    }
+
+    const updatedBook: Book = {
       ...book,
       tags,
-      comment
+      comment,
+      status: newStatus,
+      currentPage: currentPage ? parseInt(currentPage) : undefined,
+      totalPages: totalPages ? parseInt(totalPages) : undefined,
+      startDate: startDate || undefined,
+      finishDate: finishDate || undefined
     };
 
     if (checkIsSaved(book.id)) {
@@ -82,9 +121,21 @@ export default function BookDetailScreen() {
     );
   };
 
+  const setToday = (setter: (date: string) => void) => {
+    const today = new Date().toISOString().split('T')[0];
+    setter(today);
+  };
+
   if (!book) return <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} />;
 
   const isSaved = checkIsSaved(book.id);
+
+  const statusOptions: { value: Book['status'], label: string, color: string }[] = [
+    { value: 'want_to_read', label: t('wantToRead') || 'Want to Read', color: theme.textMuted },
+    { value: 'reading', label: t('reading') || 'Reading', color: theme.primary },
+    { value: 'completed', label: t('completed') || 'Completed', color: '#22c55e' },
+    { value: 'dropped', label: t('dropped') || 'Dropped', color: theme.danger },
+  ];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
@@ -144,6 +195,107 @@ export default function BookDetailScreen() {
           </View>
 
           <View style={[styles.formCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+
+            {/* Status Section */}
+            <View style={styles.formSection}>
+              <View style={styles.formLabel}>
+                <CheckCircle size={16} color={theme.primary} />
+                <Text style={[styles.formLabelText, { color: theme.text }]}>{t('status') || 'Status'}</Text>
+              </View>
+              <View style={styles.statusContainer}>
+                {statusOptions.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => setStatus(opt.value)}
+                    style={[
+                      styles.statusButton,
+                      { borderColor: theme.inputBorder, backgroundColor: theme.inputBg },
+                      status === opt.value && { backgroundColor: opt.color, borderColor: opt.color }
+                    ]}
+                  >
+                    <Text style={[
+                      styles.statusButtonText,
+                      { color: theme.text },
+                      status === opt.value && { color: '#fff', fontWeight: 'bold' }
+                    ]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Progress Section */}
+             <View style={styles.formSection}>
+              <View style={styles.formLabel}>
+                <BookOpen size={16} color={theme.primary} />
+                <Text style={[styles.formLabelText, { color: theme.text }]}>{t('progress') || 'Progress'}</Text>
+              </View>
+              <View style={styles.rowInputs}>
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t('current') || 'Current'}</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                    placeholder="0"
+                    placeholderTextColor={theme.textMuted}
+                    value={currentPage}
+                    onChangeText={setCurrentPage}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                <Text style={[styles.slash, { color: theme.textMuted }]}>/</Text>
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t('total') || 'Total'}</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                    placeholder="0"
+                    placeholderTextColor={theme.textMuted}
+                    value={totalPages}
+                    onChangeText={setTotalPages}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Dates Section */}
+            <View style={styles.formSection}>
+              <View style={styles.formLabel}>
+                <Calendar size={16} color={theme.primary} />
+                <Text style={[styles.formLabelText, { color: theme.text }]}>{t('dates') || 'Dates'}</Text>
+              </View>
+              <View style={styles.dateInputs}>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t('started') || 'Started'}</Text>
+                  <View style={styles.dateRow}>
+                    <TextInput
+                      style={[styles.input, styles.dateInput, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={theme.textMuted}
+                      value={startDate}
+                      onChangeText={setStartDate}
+                    />
+                    <TouchableOpacity onPress={() => setToday(setStartDate)} style={styles.todayButton}>
+                      <Text style={[styles.todayButtonText, { color: theme.primary }]}>{t('today') || 'Today'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t('finished') || 'Finished'}</Text>
+                   <View style={styles.dateRow}>
+                    <TextInput
+                      style={[styles.input, styles.dateInput, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={theme.textMuted}
+                      value={finishDate}
+                      onChangeText={setFinishDate}
+                    />
+                    <TouchableOpacity onPress={() => setToday(setFinishDate)} style={styles.todayButton}>
+                      <Text style={[styles.todayButtonText, { color: theme.primary }]}>{t('today') || 'Today'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+
             <View style={styles.formSection}>
               <View style={styles.formLabel}>
                 <Tag size={16} color={theme.primary} />
@@ -291,7 +443,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 24,
-    gap: 16,
+    gap: 20,
   },
   formSection: {
     gap: 8,
@@ -312,6 +464,58 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 100,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  statusButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statusButtonText: {
+    fontSize: 13,
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  inputWrapper: {
+    flex: 1,
+    gap: 4,
+  },
+  inputLabel: {
+    fontSize: 12,
+  },
+  slash: {
+    fontSize: 20,
+    marginTop: 18,
+  },
+  dateInputs: {
+    gap: 12,
+  },
+  dateInputWrapper: {
+    gap: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dateInput: {
+    flex: 1,
+  },
+  todayButton: {
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  todayButtonText: {
+    fontWeight: '600',
+    fontSize: 13,
   },
   actions: {
     gap: 12,
